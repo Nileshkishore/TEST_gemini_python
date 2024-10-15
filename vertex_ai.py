@@ -26,7 +26,7 @@ from google.api_core.exceptions import FailedPrecondition
 # Initialize Vertex AI with your project and region
 PROJECT_ID = "nileshproject-435805"
 REGION = "us-central1"  # Adjust based on the region of your endpoint
-ENDPOINT_ID = "1706460738006024192"
+ENDPOINT_ID = "1075956790174154752"
 
 # Initialize the Vertex AI platform
 aiplatform.init(project=PROJECT_ID, location=REGION)
