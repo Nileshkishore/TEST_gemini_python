@@ -1,0 +1,9 @@
+Service description,Service ID,Cost (₹),Discounts (₹),Promotions and others (₹),Unrounded subtotal (₹),Subtotal (₹),Percent change in subtotal compared to previous period
+Artifact Registry,149C-F9EC-3994,29.27,0.00,-29.27,0.000000,0.00,0%
+Dataplex,51C6-B3F5-9B38,-0.00,0.00,0.00,0.000000,0.00,0%
+Compute Engine,6F81-5844-456A,8.11,0.00,-8.11,0.000000,0.00,0%
+Cloud Storage,95FF-2EF5-5EA1,0.45,0.00,-0.45,0.000000,0.00,0%
+Vertex AI,C7E2-9256-1C43,2310.10,0.00,-2310.10,0.000000,0.00,0%
+Kubernetes Engine,CCD8-9BF1-090E,17.87,-17.87,0.00,0.000000,0.00,0%
+Notebooks,D73B-5EEA-8215,354.27,0.00,-354.27,0.000000,0.00,0%
+Networking,E505-1604-58F8,7.58,-3.48,-4.10,0.000000,0.00,0%
