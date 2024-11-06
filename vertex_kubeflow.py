@@ -1,12 +1,12 @@
 import kfp
-from kfp.v2 import dsl
-from kfp.v2.dsl import component
+from kfp import dsl
+from kfp.dsl import component
 from google.cloud import aiplatform
 from google.auth import load_credentials_from_file
 
 # Define components as functions for each step in the pipeline
 
-@component
+@component(base_image="python:3.9")
 def train_model_component(
     project_id: str,
     location: str,
@@ -34,7 +34,7 @@ def train_model_component(
     # Return the resource name of the trained model
     return model.resource_name
 
-@component
+@component(base_image="python:3.9")
 def register_model_component(
     project_id: str,
     location: str,
@@ -60,7 +60,7 @@ def register_model_component(
     # Return the registered model name
     return registered_model.resource_name
 
-@component
+@component(base_image="python:3.9")
 def deploy_model_component(
     project_id: str,
     location: str,

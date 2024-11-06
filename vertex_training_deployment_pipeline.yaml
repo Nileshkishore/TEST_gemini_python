@@ -1,0 +1,280 @@
+# PIPELINE DEFINITION
+# Name: vertex-ai-training-deployment-pipeline
+# Description: Pipeline to train, register, and deploy a model on Vertex AI using Kubeflow.
+# Inputs:
+#    artifact_uri: str
+#    container_uri: str
+#    location: str
+#    machine_type: str [Default: 'n1-standard-4']
+#    project_id: str
+#    service_account_file: str
+#    serving_container_image_uri: str
+#    staging_bucket: str
+components:
+  comp-deploy-model-component:
+    executorLabel: exec-deploy-model-component
+    inputDefinitions:
+      parameters:
+        location:
+          parameterType: STRING
+        machine_type:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        registered_model_name:
+          parameterType: STRING
+        service_account_file:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-register-model-component:
+    executorLabel: exec-register-model-component
+    inputDefinitions:
+      parameters:
+        artifact_uri:
+          parameterType: STRING
+        location:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        service_account_file:
+          parameterType: STRING
+        serving_container_image_uri:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-model-component:
+    executorLabel: exec-train-model-component
+    inputDefinitions:
+      parameters:
+        container_uri:
+          parameterType: STRING
+        location:
+          parameterType: STRING
+        machine_type:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        service_account_file:
+          parameterType: STRING
+        staging_bucket:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-deploy-model-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - deploy_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef deploy_model_component(\n    project_id: str,\n    location:\
+          \ str,\n    registered_model_name: str,\n    service_account_file: str,\n\
+          \    machine_type: str\n) -> str:\n    \"\"\"Deploy the registered model\
+          \ to an endpoint in Vertex AI.\"\"\"\n    credentials, _ = load_credentials_from_file(service_account_file)\n\
+          \n    # Initialize Vertex AI environment\n    aiplatform.init(project=project_id,\
+          \ location=location, credentials=credentials)\n\n    # Deploy the registered\
+          \ model\n    model = aiplatform.Model(model_name=registered_model_name)\n\
+          \    endpoint = model.deploy(machine_type=machine_type, min_replica_count=1,\
+          \ max_replica_count=2)\n\n    print(f\"Model deployed to endpoint: {endpoint.resource_name}\"\
+          )\n\n    # Return the endpoint name\n    return endpoint.resource_name\n\
+          \n"
+        image: python:3.9
+    exec-register-model-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_model_component(\n    project_id: str,\n    location:\
+          \ str,\n    artifact_uri: str,\n    serving_container_image_uri: str,\n\
+          \    service_account_file: str\n) -> str:\n    \"\"\"Register the trained\
+          \ model in Vertex AI.\"\"\"\n    credentials, _ = load_credentials_from_file(service_account_file)\n\
+          \n    # Initialize Vertex AI environment\n    aiplatform.init(project=project_id,\
+          \ location=location, credentials=credentials)\n\n    # Register the model\n\
+          \    registered_model = aiplatform.Model.upload(\n        display_name=\"\
+          iris-registered-model-1\",\n        artifact_uri=artifact_uri,\n       \
+          \ serving_container_image_uri=serving_container_image_uri\n    )\n\n   \
+          \ print(\"Model registered.\")\n\n    # Return the registered model name\n\
+          \    return registered_model.resource_name\n\n"
+        image: python:3.9
+    exec-train-model-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model_component(\n    project_id: str,\n    location: str,\n\
+          \    staging_bucket: str,\n    service_account_file: str,\n    container_uri:\
+          \ str,\n    machine_type: str\n) -> str:\n    \"\"\"Train a model using\
+          \ Vertex AI CustomContainerTrainingJob.\"\"\"\n    credentials, _ = load_credentials_from_file(service_account_file)\n\
+          \n    # Initialize Vertex AI environment\n    aiplatform.init(project=project_id,\
+          \ location=location, staging_bucket=staging_bucket, credentials=credentials)\n\
+          \n    # Define and run the training job\n    job = aiplatform.CustomContainerTrainingJob(\n\
+          \        display_name=\"iris-custom-training-job\",\n        container_uri=container_uri,\n\
+          \        staging_bucket=staging_bucket\n    )\n\n    model = job.run(replica_count=1,\
+          \ machine_type=machine_type)\n    print(\"Model training completed.\")\n\
+          \n    # Return the resource name of the trained model\n    return model.resource_name\n\
+          \n"
+        image: python:3.9
+pipelineInfo:
+  description: Pipeline to train, register, and deploy a model on Vertex AI using
+    Kubeflow.
+  name: vertex-ai-training-deployment-pipeline
+root:
+  dag:
+    tasks:
+      deploy-model-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-deploy-model-component
+        dependentTasks:
+        - register-model-component
+        inputs:
+          parameters:
+            location:
+              componentInputParameter: location
+            machine_type:
+              componentInputParameter: machine_type
+            project_id:
+              componentInputParameter: project_id
+            registered_model_name:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: register-model-component
+            service_account_file:
+              componentInputParameter: service_account_file
+        taskInfo:
+          name: deploy-model-component
+      register-model-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-register-model-component
+        dependentTasks:
+        - train-model-component
+        inputs:
+          parameters:
+            artifact_uri:
+              componentInputParameter: artifact_uri
+            location:
+              componentInputParameter: location
+            project_id:
+              componentInputParameter: project_id
+            service_account_file:
+              componentInputParameter: service_account_file
+            serving_container_image_uri:
+              componentInputParameter: serving_container_image_uri
+        taskInfo:
+          name: register-model-component
+      train-model-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model-component
+        inputs:
+          parameters:
+            container_uri:
+              componentInputParameter: container_uri
+            location:
+              componentInputParameter: location
+            machine_type:
+              componentInputParameter: machine_type
+            project_id:
+              componentInputParameter: project_id
+            service_account_file:
+              componentInputParameter: service_account_file
+            staging_bucket:
+              componentInputParameter: staging_bucket
+        taskInfo:
+          name: train-model-component
+  inputDefinitions:
+    parameters:
+      artifact_uri:
+        parameterType: STRING
+      container_uri:
+        parameterType: STRING
+      location:
+        parameterType: STRING
+      machine_type:
+        defaultValue: n1-standard-4
+        isOptional: true
+        parameterType: STRING
+      project_id:
+        parameterType: STRING
+      service_account_file:
+        parameterType: STRING
+      serving_container_image_uri:
+        parameterType: STRING
+      staging_bucket:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.9.0
